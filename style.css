@@ -1,0 +1,173 @@
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:    #185FA5;
+  --blue-dk: #0C447C;
+  --green:   #3B6D11;
+  --red:     #A32D2D;
+  --purple:  #534AB7;
+  --gray:    #888780;
+  --bg:      #F5F4F0;
+  --bg2:     #ECEAE3;
+  --surface: #FFFFFF;
+  --border:  rgba(0,0,0,0.10);
+  --text:    #2C2C2A;
+  --text2:   #6B6A66;
+  --radius:  12px;
+  --radius-sm: 8px;
+}
+
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+
+/* ── Layout ── */
+.app { max-width: 480px; margin: 0 auto; padding-bottom: 2rem; }
+
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.header-title { font-size: 16px; font-weight: 600; color: var(--blue); }
+.header-sub   { font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+
+/* ── Tab Bar ── */
+.tab-bar {
+  display: flex; background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  position: sticky; top: 45px; z-index: 99;
+}
+.tab {
+  flex: 1; padding: 11px 4px; text-align: center;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  color: var(--text2); background: none; border: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-icon { font-size: 15px; }
+
+/* ── Screens ── */
+.screen { display: none; padding: 12px 12px 0; }
+.screen.active { display: block; }
+
+/* ── Card ── */
+.card {
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+}
+
+/* ── Metrics ── */
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.metric { background: var(--bg2); border-radius: var(--radius-sm); padding: 12px 14px; }
+.label { font-size: 11px; color: var(--text2); margin-bottom: 3px; letter-spacing: 0.02em; }
+.value { font-size: 20px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.value.sm { font-size: 14px; }
+
+/* ── Timer ── */
+.timer-display {
+  font-size: 38px; font-weight: 600; color: var(--text);
+  text-align: center; letter-spacing: 3px;
+  padding: 10px 0 14px; font-variant-numeric: tabular-nums;
+}
+
+/* ── Status Bar ── */
+.status-bar { display: flex; align-items: center; font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; flex-shrink: 0; transition: background 0.3s; }
+.dot-gray  { background: var(--gray); }
+.dot-green { background: #5A9E22; box-shadow: 0 0 0 3px rgba(90,158,34,0.2); }
+.dot-amber { background: #C48A10; box-shadow: 0 0 0 3px rgba(196,138,16,0.2); }
+.dot-red   { background: #D94040; box-shadow: 0 0 0 3px rgba(217,64,64,0.2); }
+
+/* ── Buttons ── */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 12px 16px; margin-bottom: 8px;
+  border-radius: var(--radius-sm); border: 0.5px solid var(--border);
+  background: var(--surface); color: var(--text);
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { opacity: 0.8; }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn-primary { background: var(--blue); color: #fff; border-color: var(--blue-dk); }
+.btn-primary:active { background: var(--blue-dk); }
+.btn-danger  { background: var(--red); color: #fff; border-color: #7A1F1F; }
+.btn-danger:active { background: #7A1F1F; }
+.btn-success { background: var(--green); color: #fff; border-color: #274F0A; }
+.btn-export  { background: var(--purple); color: #fff; border-color: #3C3489; }
+.btn-export:active { background: #3C3489; }
+
+/* ── Map ── */
+.map-wrap {
+  width: 100%; height: 310px;
+  border-radius: var(--radius); overflow: hidden;
+  border: 0.5px solid var(--border); margin-bottom: 8px;
+}
+#map-helper, #map-handler { width: 100%; height: 100%; }
+
+/* ── Legend ── */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text2); padding: 2px 2px 10px; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Notices ── */
+.gps-notice {
+  font-size: 12px; color: var(--text2); line-height: 1.5;
+  background: var(--bg2); border-radius: var(--radius-sm);
+  padding: 8px 12px; margin-bottom: 10px;
+}
+.export-info { font-size: 12px; color: var(--text2); text-align: center; margin-top: 2px; margin-bottom: 8px; }
+
+/* ── Compare Paths ── */
+.compare-path {
+  border-radius: var(--radius-sm); padding: 9px 12px;
+  font-size: 13px; margin-bottom: 6px; cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.compare-path.selected { border-color: var(--blue); }
+.path-wonder { background: #E6F1FB; color: #0C447C; }
+.path-cindy  { background: #FAECE7; color: #712B13; }
+.path-old    { background: #F1EFE8; color: #444441; }
+
+/* ── Badges ── */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.badge-wonder { background: #B5D4F4; color: #0C447C; }
+.badge-cindy  { background: #F5C4B3; color: #712B13; }
+.badge-old    { background: #D3D1C7; color: #444441; }
+
+/* ── Textarea ── */
+textarea {
+  width: 100%; min-height: 75px;
+  border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 9px 12px; font-size: 14px; line-height: 1.5;
+  font-family: inherit; color: var(--text);
+  background: var(--bg2); resize: vertical;
+}
+textarea:focus { outline: none; border-color: var(--blue); }
+
+/* ── Session Log Rows ── */
+.session-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 0; border-bottom: 0.5px solid var(--border);
+  font-size: 13px; cursor: pointer;
+}
+.session-row:last-child { border-bottom: none; }
+.session-info { flex: 1; }
+.session-meta { color: var(--text2); font-size: 12px; margin-top: 2px; }
+.session-actions { display: flex; gap: 6px; }
+.btn-icon {
+  width: 30px; height: 30px; border-radius: 6px;
+  border: 0.5px solid var(--border); background: var(--bg2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 14px;
+}
+
+/* ── Leaflet overrides ── */
+.leaflet-control-attribution { font-size: 10px !important; }
+.leaflet-container { font-family: inherit; }

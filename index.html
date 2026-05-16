@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#185FA5"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="맨트레일링"/>
+  <title>맨트레일링 GPS 경로 추적</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <span class="header-title">🐾 맨트레일링 GPS</span>
+      <span class="header-sub" id="header-time"></span>
+    </header>
+
+    <div class="tab-bar">
+      <button class="tab active" onclick="switchTab('helper')" aria-label="헬퍼 탭">
+        <span class="tab-icon">🏃</span> 헬퍼
+      </button>
+      <button class="tab" onclick="switchTab('handler')" aria-label="핸들러 탭">
+        <span class="tab-icon">🗺️</span> 핸들러
+      </button>
+      <button class="tab" onclick="switchTab('log')" aria-label="훈련 로그 탭">
+        <span class="tab-icon">📋</span> 훈련 로그
+      </button>
+    </div>
+
+    <!-- ── 헬퍼 탭 ── -->
+    <section id="screen-helper" class="screen active">
+      <div class="card">
+        <div class="status-bar">
+          <span class="status-dot dot-gray" id="gps-dot"></span>
+          <span id="gps-status">GPS 대기 중</span>
+        </div>
+        <div class="timer-display" id="timer-display">00:00:00</div>
+        <div class="metric-grid">
+          <div class="metric"><div class="label">출발 시각</div><div class="value sm" id="start-time-display">—</div></div>
+          <div class="metric"><div class="label">도착 시각</div><div class="value sm" id="end-time-display">—</div></div>
+          <div class="metric"><div class="label">거리</div><div class="value" id="dist-display">0m</div></div>
+          <div class="metric"><div class="label">기록 포인트</div><div class="value" id="point-display">0</div></div>
+        </div>
+        <p class="gps-notice" id="gps-notice">
+          ℹ️ 추적 시작 시 브라우저가 위치 권한을 요청합니다. 허용 후 사용하세요.
+        </p>
+        <button class="btn btn-primary" id="start-btn" onclick="startTracking()">▶ 추적 시작</button>
+        <button class="btn btn-danger" id="stop-btn" onclick="stopTracking()" style="display:none">⏹ 추적 종료 및 저장</button>
+      </div>
+
+      <div class="map-wrap"><div id="map-helper"></div></div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#3B6D11"></span>출발</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>현재 위치</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>도착</span>
+      </div>
+
+      <button class="btn btn-export" id="export-btn" onclick="exportRoute()" disabled>⬇ 경로 저장 (GeoJSON)</button>
+      <p class="export-info" id="export-info">추적 종료 후 저장 가능합니다</p>
+    </section>
+
+    <!-- ── 핸들러 탭 ── -->
+    <section id="screen-handler" class="screen">
+      <div class="card">
+        <p class="label" style="margin-bottom:8px">경로 선택 (비교)</p>
+        <div class="compare-path path-wonder selected" id="cmp-wonder" onclick="toggleCompare('wonder')">
+          <span class="badge badge-wonder">원더</span> 오늘 1회차 &nbsp;·&nbsp; 12:34 출발 · 8분 22초
+        </div>
+        <div class="compare-path path-cindy selected" id="cmp-cindy" onclick="toggleCompare('cindy')">
+          <span class="badge badge-cindy">신디</span> 오늘 2회차 &nbsp;·&nbsp; 14:10 출발 · 6분 55초
+        </div>
+        <div class="compare-path path-old" id="cmp-old" onclick="toggleCompare('old')">
+          <span class="badge badge-old">이전</span> 어제 1회차 &nbsp;·&nbsp; 09:00 출발 · 9분 10초
+        </div>
+      </div>
+      <div class="map-wrap"><div id="map-handler"></div></div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>원더</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#D85A30"></span>신디</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#888780"></span>이전 회차</span>
+      </div>
+      <div class="card" style="margin-top:0.5rem">
+        <p class="label" style="margin-bottom:6px">훈련 메모</p>
+        <textarea id="memo-text" placeholder="풍향, 날씨, 컨디션, 특이사항 등..."></textarea>
+        <button class="btn btn-success" style="margin-top:8px" onclick="saveMemo()">✓ 메모 저장</button>
+        <p class="export-info" id="memo-info"></p>
+      </div>
+    </section>
+
+    <!-- ── 훈련 로그 탭 ── -->
+    <section id="screen-log" class="screen">
+      <div class="metric-grid">
+        <div class="metric"><div class="label">이번 달 회차</div><div class="value" id="log-count">0회</div></div>
+        <div class="metric"><div class="label">총 누적 거리</div><div class="value" id="log-dist">0m</div></div>
+      </div>
+      <div class="card">
+        <p class="label" style="margin-bottom:10px">저장된 훈련 기록</p>
+        <div id="session-list"><p style="color:#888;font-size:13px">아직 저장된 기록이 없습니다.</p></div>
+      </div>
+      <button class="btn" onclick="clearLog()" style="margin-top:0.5rem">🗑 전체 기록 초기화</button>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
