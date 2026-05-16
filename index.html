@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#185FA5"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="맨트레일링"/>
+  <title>맨트레일링 GPS 경로 추적</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:#185FA5; --blue-dk:#0C447C; --green:#3B6D11; --red:#A32D2D;
+  --purple:#534AB7; --gray:#888780;
+  --bg:#F5F4F0; --bg2:#ECEAE3; --surface:#FFFFFF;
+  --border:rgba(0,0,0,0.10); --text:#2C2C2A; --text2:#6B6A66;
+  --radius:12px; --radius-sm:8px;
+}
+html,body { height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+.app { max-width:480px; margin:0 auto; padding-bottom:2rem; }
+
+/* ── Header ── */
+.app-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px 10px; background:var(--surface);
+  border-bottom:0.5px solid var(--border);
+  position:sticky; top:0; z-index:100;
+}
+.header-title { font-size:16px; font-weight:600; color:var(--blue); }
+.header-sub   { font-size:12px; color:var(--text2); font-variant-numeric:tabular-nums; }
+
+/* ── Tab Bar ── */
+.tab-bar {
+  display:flex; background:var(--surface);
+  border-bottom:0.5px solid var(--border);
+  position:sticky; top:45px; z-index:99;
+}
+.tab {
+  flex:1; padding:11px 4px; text-align:center;
+  font-size:13px; font-weight:500; cursor:pointer;
+  color:var(--text2); background:none; border:none;
+  border-bottom:2px solid transparent;
+  transition:color 0.15s,border-color 0.15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+
+/* ── Screens ── */
+.screen { display:none; padding:12px 12px 0; }
+.screen.active { display:block; }
+
+/* ── Card ── */
+.card {
+  background:var(--surface); border:0.5px solid var(--border);
+  border-radius:var(--radius); padding:16px; margin-bottom:12px;
+}
+
+/* ── Metrics ── */
+.metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.metric { background:var(--bg2); border-radius:var(--radius-sm); padding:12px 14px; }
+.label { font-size:11px; color:var(--text2); margin-bottom:3px; letter-spacing:0.02em; }
+.value { font-size:20px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
+.value.sm { font-size:14px; }
+
+/* ── Timer ── */
+.timer-display {
+  font-size:38px; font-weight:600; color:var(--text);
+  text-align:center; letter-spacing:3px;
+  padding:10px 0 14px; font-variant-numeric:tabular-nums;
+}
+
+/* ── Status ── */
+.status-bar { display:flex; align-items:center; font-size:13px; color:var(--text2); margin-bottom:10px; }
+.status-dot { width:8px; height:8px; border-radius:50%; margin-right:7px; flex-shrink:0; transition:background 0.3s; }
+.dot-gray  { background:var(--gray); }
+.dot-green { background:#5A9E22; box-shadow:0 0 0 3px rgba(90,158,34,0.2); }
+.dot-amber { background:#C48A10; box-shadow:0 0 0 3px rgba(196,138,16,0.2); }
+.dot-red   { background:#D94040; box-shadow:0 0 0 3px rgba(217,64,64,0.2); }
+
+/* ── Buttons ── */
+.btn {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  width:100%; padding:12px 16px; margin-bottom:8px;
+  border-radius:var(--radius-sm); border:0.5px solid var(--border);
+  background:var(--surface); color:var(--text);
+  font-size:14px; font-weight:500; cursor:pointer;
+  transition:opacity 0.15s; -webkit-tap-highlight-color:transparent;
+}
+.btn:active { opacity:0.75; }
+.btn:disabled { opacity:0.35; cursor:not-allowed; }
+.btn-primary { background:var(--blue); color:#fff; border-color:var(--blue-dk); }
+.btn-danger  { background:var(--red);  color:#fff; border-color:#7A1F1F; }
+.btn-success { background:var(--green);color:#fff; border-color:#274F0A; }
+.btn-export  { background:var(--purple);color:#fff;border-color:#3C3489; }
+
+/* ── Map ── */
+.map-wrap {
+  width:100%; height:310px;
+  border-radius:var(--radius); overflow:hidden;
+  border:0.5px solid var(--border); margin-bottom:8px;
+}
+#map-helper,#map-handler { width:100%; height:100%; }
+
+/* ── Legend ── */
+.legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text2); padding:2px 2px 10px; }
+.legend-item { display:flex; align-items:center; gap:4px; }
+.legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+/* ── Notices ── */
+.gps-notice {
+  font-size:12px; color:var(--text2); line-height:1.5;
+  background:var(--bg2); border-radius:var(--radius-sm);
+  padding:8px 12px; margin-bottom:10px;
+}
+.export-info { font-size:12px; color:var(--text2); text-align:center; margin-top:2px; margin-bottom:8px; }
+
+/* ── Compare ── */
+.compare-path {
+  border-radius:var(--radius-sm); padding:9px 12px;
+  font-size:13px; margin-bottom:6px; cursor:pointer;
+  border:1.5px solid transparent; transition:border-color 0.15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.compare-path.selected { border-color:var(--blue); }
+.path-wonder { background:#E6F1FB; color:#0C447C; }
+.path-cindy  { background:#FAECE7; color:#712B13; }
+.path-old    { background:#F1EFE8; color:#444441; }
+
+/* ── Badges ── */
+.badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; }
+.badge-wonder { background:#B5D4F4; color:#0C447C; }
+.badge-cindy  { background:#F5C4B3; color:#712B13; }
+.badge-old    { background:#D3D1C7; color:#444441; }
+
+/* ── Textarea ── */
+textarea {
+  width:100%; min-height:75px;
+  border:0.5px solid var(--border); border-radius:var(--radius-sm);
+  padding:9px 12px; font-size:14px; line-height:1.5;
+  font-family:inherit; color:var(--text); background:var(--bg2); resize:vertical;
+}
+textarea:focus { outline:none; border-color:var(--blue); }
+
+/* ── Log Rows ── */
+.session-row {
+  display:flex; align-items:center; gap:10px;
+  padding:11px 0; border-bottom:0.5px solid var(--border); font-size:13px;
+}
+.session-row:last-child { border-bottom:none; }
+.session-info { flex:1; }
+.session-meta { color:var(--text2); font-size:12px; margin-top:2px; }
+.session-actions { display:flex; gap:6px; }
+.btn-icon {
+  width:32px; height:32px; border-radius:6px;
+  border:0.5px solid var(--border); background:var(--bg2);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:15px; -webkit-tap-highlight-color:transparent;
+}
+.leaflet-control-attribution { font-size:10px !important; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <span class="header-title">🐾 맨트레일링 GPS</span>
+    <span class="header-sub" id="header-time"></span>
+  </header>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('helper')">🏃 헬퍼</button>
+    <button class="tab" onclick="switchTab('handler')">🗺️ 핸들러</button>
+    <button class="tab" onclick="switchTab('log')">📋 훈련 로그</button>
+  </div>
+
+  <!-- 헬퍼 탭 -->
+  <section id="screen-helper" class="screen active">
+    <div class="card">
+      <div class="status-bar">
+        <span class="status-dot dot-gray" id="gps-dot"></span>
+        <span id="gps-status">GPS 대기 중</span>
+      </div>
+      <div class="timer-display" id="timer-display">00:00:00</div>
+      <div class="metric-grid">
+        <div class="metric"><div class="label">출발 시각</div><div class="value sm" id="start-time-display">—</div></div>
+        <div class="metric"><div class="label">도착 시각</div><div class="value sm" id="end-time-display">—</div></div>
+        <div class="metric"><div class="label">거리</div><div class="value" id="dist-display">0m</div></div>
+        <div class="metric"><div class="label">기록 포인트</div><div class="value" id="point-display">0</div></div>
+      </div>
+      <p class="gps-notice" id="gps-notice">ℹ️ 추적 시작 시 브라우저가 위치 권한을 요청합니다. 허용 후 사용하세요.</p>
+      <button class="btn btn-primary" id="start-btn" onclick="startTracking()">▶ 추적 시작</button>
+      <button class="btn btn-danger"  id="stop-btn"  onclick="stopTracking()" style="display:none">⏹ 추적 종료 및 저장</button>
+    </div>
+    <div class="map-wrap"><div id="map-helper"></div></div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#3B6D11"></span>출발</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>현재 위치</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>도착</span>
+    </div>
+    <button class="btn btn-export" id="export-btn" onclick="exportRoute()" disabled>⬇ 경로 저장 (GeoJSON)</button>
+    <p class="export-info" id="export-info">추적 종료 후 저장 가능합니다</p>
+  </section>
+
+  <!-- 핸들러 탭 -->
+  <section id="screen-handler" class="screen">
+    <div class="card">
+      <p class="label" style="margin-bottom:8px">경로 선택 (비교)</p>
+      <div class="compare-path path-wonder selected" id="cmp-wonder" onclick="toggleCompare('wonder')">
+        <span class="badge badge-wonder">원더</span> 오늘 1회차 &nbsp;·&nbsp; 12:34 출발 · 8분 22초
+      </div>
+      <div class="compare-path path-cindy selected" id="cmp-cindy" onclick="toggleCompare('cindy')">
+        <span class="badge badge-cindy">신디</span> 오늘 2회차 &nbsp;·&nbsp; 14:10 출발 · 6분 55초
+      </div>
+      <div class="compare-path path-old" id="cmp-old" onclick="toggleCompare('old')">
+        <span class="badge badge-old">이전</span> 어제 1회차 &nbsp;·&nbsp; 09:00 출발 · 9분 10초
+      </div>
+    </div>
+    <div class="map-wrap"><div id="map-handler"></div></div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>원더</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#D85A30"></span>신디</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#888780"></span>이전 회차</span>
+    </div>
+    <div class="card" style="margin-top:0.5rem">
+      <p class="label" style="margin-bottom:6px">훈련 메모</p>
+      <textarea id="memo-text" placeholder="풍향, 날씨, 컨디션, 특이사항 등..."></textarea>
+      <button class="btn btn-success" style="margin-top:8px" onclick="saveMemo()">✓ 메모 저장</button>
+      <p class="export-info" id="memo-info"></p>
+    </div>
+  </section>
+
+  <!-- 훈련 로그 탭 -->
+  <section id="screen-log" class="screen">
+    <div class="metric-grid">
+      <div class="metric"><div class="label">이번 달 회차</div><div class="value" id="log-count">0회</div></div>
+      <div class="metric"><div class="label">총 누적 거리</div><div class="value" id="log-dist">0m</div></div>
+    </div>
+    <div class="card">
+      <p class="label" style="margin-bottom:10px">저장된 훈련 기록</p>
+      <div id="session-list"><p style="color:#888;font-size:13px">아직 저장된 기록이 없습니다.</p></div>
+    </div>
+    <button class="btn" style="margin-top:0.5rem" onclick="clearLog()">🗑 전체 기록 초기화</button>
+  </section>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+const TILE_URL  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const DEFAULT_CENTER = [37.5665, 126.9780];
+const DEFAULT_ZOOM   = 16;
+const STORAGE_KEY    = 'mantrailing_sessions';
+
+const SAMPLE_PATHS = {
+  wonder:[[37.5760,126.9770],[37.5765,126.9778],[37.5770,126.9786],[37.5775,126.9793],[37.5780,126.9800],[37.5785,126.9808],[37.5790,126.9815],[37.5795,126.9823],[37.5800,126.9830]],
+  cindy: [[37.5760,126.9770],[37.5763,126.9780],[37.5767,126.9790],[37.5772,126.9798],[37.5778,126.9805],[37.5784,126.9813],[37.5789,126.9820],[37.5795,126.9828],[37.5801,126.9835]],
+  old:   [[37.5760,126.9770],[37.5764,126.9777],[37.5769,126.9784],[37.5774,126.9791],[37.5779,126.9799],[37.5785,126.9806],[37.5791,126.9813],[37.5796,126.9821],[37.5802,126.9828]]
+};
+
+let mapHelper=null,mapHandler=null,helperPolyline=null;
+let currentMarker=null,startMarker=null,endMarker=null,handlerGroup=null;
+let watchId=null,timerInterval=null;
+let seconds=0,pathCoords=[],totalDist=0;
+let startTimeStr='',endTimeStr='',startDateStr='';
+const compareState={wonder:true,cindy:true,old:false};
+
+const pad = v => String(v).padStart(2,'0');
+function nowStr(){ const n=new Date(); return `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`; }
+function nowDateStr(){ const n=new Date(); return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`; }
+function nowFilename(){ const n=new Date(); return `${n.getFullYear()}${pad(n.getMonth()+1)}${pad(n.getDate())}_${pad(n.getHours())}${pad(n.getMinutes())}`; }
+function formatTime(s){ return [Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>pad(v)).join(':'); }
+function haversine(a,b){
+  const R=6371000,r=d=>d*Math.PI/180,dLat=r(b[0]-a[0]),dLon=r(b[1]-a[1]);
+  const x=Math.sin(dLat/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function fmtDist(m){ return m<1000?`${Math.round(m)}m`:`${(m/1000).toFixed(2)}km`; }
+
+function makeIcon(bg,letter,size=26){
+  return L.divIcon({className:'',
+    html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${Math.round(size*0.46)}px;border:2.5px solid rgba(255,255,255,0.9);box-shadow:0 2px 6px rgba(0,0,0,0.3)">${letter}</div>`,
+    iconSize:[size,size],iconAnchor:[size/2,size/2]});
+}
+function pulseIcon(){
+  return L.divIcon({className:'',
+    html:`<div style="width:20px;height:20px;border-radius:50%;background:#185FA5;border:3px solid rgba(255,255,255,0.95);box-shadow:0 0 0 7px rgba(24,95,165,0.22),0 2px 6px rgba(0,0,0,0.25)"></div>`,
+    iconSize:[20,20],iconAnchor:[10,10]});
+}
+
+function initMaps(){
+  if(mapHelper) return;
+  mapHelper=L.map('map-helper',{zoomControl:true}).setView(DEFAULT_CENTER,DEFAULT_ZOOM);
+  L.tileLayer(TILE_URL,{attribution:TILE_ATTR,maxZoom:19}).addTo(mapHelper);
+  helperPolyline=L.polyline([],{color:'#185FA5',weight:5,lineCap:'round',lineJoin:'round'}).addTo(mapHelper);
+
+  mapHandler=L.map('map-handler',{zoomControl:true}).setView(DEFAULT_CENTER,DEFAULT_ZOOM);
+  L.tileLayer(TILE_URL,{attribution:TILE_ATTR,maxZoom:19}).addTo(mapHandler);
+  handlerGroup=L.layerGroup().addTo(mapHandler);
+  drawHandlerPaths();
+}
+
+function drawHandlerPaths(){
+  if(!handlerGroup) return;
+  handlerGroup.clearLayers();
+  const cfg={
+    wonder:{color:'#185FA5',label:'원더',weight:5,dash:null},
+    cindy: {color:'#D85A30',label:'신디', weight:5,dash:null},
+    old:   {color:'#888780',label:'이전', weight:3,dash:'8,5'}
+  };
+  const vis=[];
+  ['old','cindy','wonder'].forEach(k=>{
+    if(!compareState[k]) return;
+    const{color,label,weight,dash}=cfg[k],pts=SAMPLE_PATHS[k];
+    vis.push(...pts);
+    L.polyline(pts,{color,weight,dashArray:dash,lineCap:'round',lineJoin:'round',opacity:0.85}).addTo(handlerGroup);
+    L.marker(pts[pts.length-1],{icon:makeIcon(color,label[0])}).bindTooltip(label,{permanent:false,direction:'top'}).addTo(handlerGroup);
+  });
+  L.marker(SAMPLE_PATHS.wonder[0],{icon:makeIcon('#3B6D11','S')}).addTo(handlerGroup);
+  if(vis.length) mapHandler.fitBounds(L.latLngBounds(vis),{padding:[24,24]});
+}
+
+function toggleCompare(type){
+  compareState[type]=!compareState[type];
+  document.getElementById('cmp-'+type).classList.toggle('selected',compareState[type]);
+  drawHandlerPaths();
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['helper','handler','log'][i]===name));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  setTimeout(()=>{
+    initMaps();
+    if(mapHelper) mapHelper.invalidateSize();
+    if(mapHandler) mapHandler.invalidateSize();
+    if(name==='log') renderLog();
+  },60);
+}
+
+function startTracking(){
+  if(!navigator.geolocation){ setStatus('red','GPS를 지원하지 않는 브라우저입니다'); return; }
+  initMaps();
+  pathCoords=[];totalDist=0;seconds=0;
+  startTimeStr=nowStr(); startDateStr=nowDateStr();
+  document.getElementById('start-time-display').textContent=startTimeStr;
+  document.getElementById('end-time-display').textContent='—';
+  document.getElementById('dist-display').textContent='0m';
+  document.getElementById('point-display').textContent='0';
+  document.getElementById('start-btn').style.display='none';
+  document.getElementById('stop-btn').style.display='';
+  document.getElementById('export-btn').disabled=true;
+  document.getElementById('export-info').textContent='추적 종료 후 저장 가능합니다';
+  document.getElementById('gps-notice').style.display='none';
+  [startMarker,endMarker,currentMarker].forEach(m=>{if(m)mapHelper.removeLayer(m);});
+  startMarker=endMarker=currentMarker=null;
+  helperPolyline.setLatLngs([]);
+  setStatus('amber','GPS 신호 수신 중...');
+  timerInterval=setInterval(()=>{ seconds++; document.getElementById('timer-display').textContent=formatTime(seconds); },1000);
+  watchId=navigator.geolocation.watchPosition(onPosition,onGpsError,{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
+}
+
+function onPosition(pos){
+  const{latitude:lat,longitude:lng,accuracy}=pos.coords,coord=[lat,lng];
+  if(pathCoords.length===0){
+    mapHelper.setView(coord,17);
+    startMarker=L.marker(coord,{icon:makeIcon('#3B6D11','S')})
+      .bindTooltip(`출발 ${startTimeStr}`,{permanent:true,direction:'top',offset:[0,-12]}).addTo(mapHelper);
+    setStatus('green',`GPS 추적 중 (정확도 ±${Math.round(accuracy)}m)`);
+  } else {
+    totalDist+=haversine(pathCoords[pathCoords.length-1],coord);
+    document.getElementById('dist-display').textContent=fmtDist(totalDist);
+  }
+  pathCoords.push(coord);
+  document.getElementById('point-display').textContent=pathCoords.length;
+  helperPolyline.setLatLngs(pathCoords);
+  if(currentMarker) currentMarker.setLatLng(coord);
+  else currentMarker=L.marker(coord,{icon:pulseIcon()}).addTo(mapHelper);
+  mapHelper.panTo(coord);
+}
+
+function onGpsError(err){
+  const msgs={1:'위치 권한이 거부됐습니다',2:'GPS 신호를 찾을 수 없습니다',3:'GPS 시간 초과'};
+  setStatus('red',msgs[err.code]||'GPS 오류');
+}
+
+function stopTracking(){
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  clearInterval(timerInterval);
+  endTimeStr=nowStr();
+  document.getElementById('end-time-display').textContent=endTimeStr;
+  document.getElementById('start-btn').style.display='';
+  document.getElementById('stop-btn').style.display='none';
+  setStatus('red','추적 완료');
+  if(pathCoords.length>0){
+    const last=pathCoords[pathCoords.length-1];
+    if(currentMarker){mapHelper.removeLayer(currentMarker);currentMarker=null;}
+    endMarker=L.marker(last,{icon:makeIcon('#E24B4A','E')})
+      .bindTooltip(`도착 ${endTimeStr}`,{permanent:true,direction:'top',offset:[0,-12]}).addTo(mapHelper);
+    if(pathCoords.length>1) mapHelper.fitBounds(helperPolyline.getBounds(),{padding:[32,32]});
+  }
+  document.getElementById('export-btn').disabled=false;
+  document.getElementById('export-info').textContent='GeoJSON · QGIS·Google Maps에서 열 수 있습니다';
+  saveSession();
+}
+
+function exportRoute(){
+  if(!pathCoords.length) return;
+  const geojson={type:'FeatureCollection',features:[{type:'Feature',
+    geometry:{type:'LineString',coordinates:pathCoords.map(c=>[c[1],c[0]])},
+    properties:{title:'맨트레일링 경로 기록',date:startDateStr,start_time:startTimeStr,end_time:endTimeStr,duration:formatTime(seconds),distance_m:Math.round(totalDist),points:pathCoords.length}
+  }]};
+  const blob=new Blob([JSON.stringify(geojson,null,2)],{type:'application/geo+json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url; a.download=`mantrailing_${nowFilename()}.geojson`; a.click(); URL.revokeObjectURL(url);
+}
+
+function saveSession(){
+  const sessions=loadSessions();
+  sessions.unshift({id:Date.now(),date:startDateStr,start:startTimeStr,end:endTimeStr,
+    duration:formatTime(seconds),dist_m:Math.round(totalDist),points:pathCoords.length,coords:pathCoords});
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions.slice(0,100)));
+}
+function loadSessions(){ try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');}catch{return[];} }
+
+function renderLog(){
+  const sessions=loadSessions();
+  const thisMonth=new Date().toISOString().slice(0,7);
+  const mSess=sessions.filter(s=>s.date.startsWith(thisMonth));
+  const totalM=sessions.reduce((a,s)=>a+(s.dist_m||0),0);
+  document.getElementById('log-count').textContent=`${mSess.length}회`;
+  document.getElementById('log-dist').textContent=fmtDist(totalM);
+  const list=document.getElementById('session-list');
+  if(!sessions.length){ list.innerHTML='<p style="color:#888;font-size:13px">아직 저장된 기록이 없습니다.</p>'; return; }
+  list.innerHTML=sessions.map(s=>`
+    <div class="session-row">
+      <div class="session-info">
+        <div>${s.date} · ${s.start} 출발</div>
+        <div class="session-meta">소요 ${s.duration} · ${fmtDist(s.dist_m)} · ${s.points}포인트</div>
+      </div>
+      <div class="session-actions">
+        <div class="btn-icon" title="다운로드" onclick="downloadSession(${s.id})">⬇</div>
+        <div class="btn-icon" title="삭제" onclick="deleteSession(${s.id})">🗑</div>
+      </div>
+    </div>`).join('');
+}
+
+function downloadSession(id){
+  const s=loadSessions().find(x=>x.id===id); if(!s) return;
+  const geojson={type:'FeatureCollection',features:[{type:'Feature',
+    geometry:{type:'LineString',coordinates:s.coords.map(c=>[c[1],c[0]])},
+    properties:{date:s.date,start_time:s.start,end_time:s.end,duration:s.duration,distance_m:s.dist_m}
+  }]};
+  const blob=new Blob([JSON.stringify(geojson,null,2)],{type:'application/geo+json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url; a.download=`mantrailing_${s.date}_${s.start.replace(/:/g,'')}.geojson`; a.click(); URL.revokeObjectURL(url);
+}
+function deleteSession(id){
+  if(!confirm('이 기록을 삭제할까요?')) return;
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(loadSessions().filter(s=>s.id!==id)));
+  renderLog();
+}
+function clearLog(){
+  if(!confirm('전체 훈련 기록을 초기화할까요?')) return;
+  localStorage.removeItem(STORAGE_KEY); renderLog();
+}
+function saveMemo(){
+  const text=document.getElementById('memo-text').value.trim(); if(!text) return;
+  const memos=JSON.parse(localStorage.getItem('mantrailing_memos')||'[]');
+  memos.unshift({date:nowDateStr(),time:nowStr(),text});
+  localStorage.setItem('mantrailing_memos',JSON.stringify(memos.slice(0,200)));
+  document.getElementById('memo-info').textContent=`✓ ${nowStr()} 저장됨`;
+  document.getElementById('memo-text').value='';
+}
+function setStatus(color,text){
+  document.getElementById('gps-dot').className='status-dot dot-'+color;
+  document.getElementById('gps-status').textContent=text;
+}
+
+// 헤더 시계
+setInterval(()=>{ const el=document.getElementById('header-time'); if(el) el.textContent=nowStr(); },1000);
+
+// 초기 지도 로드
+setTimeout(initMaps,200);
+</script>
+</body>
+</html>
