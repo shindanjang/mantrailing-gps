@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#185FA5"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="Mantrailing GPS"/>
+  <title>DK's Mantrailing GPS</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --blue:#185FA5;--blue-dk:#0C447C;--green:#3B6D11;--red:#A32D2D;--orange:#C06010;--teal:#0E7C6B;
+  --bg:#F5F4F0;--bg2:#ECEAE3;--surface:#fff;
+  --border:rgba(0,0,0,0.10);--text:#2C2C2A;--text2:#6B6A66;
+  --radius:12px;--radius-sm:8px;
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);}
+.app{max-width:480px;margin:0 auto;padding-bottom:2rem;}
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;background:var(--surface);border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:100;}
+.header-title{font-size:15px;font-weight:700;color:var(--blue);}
+.header-title span{font-weight:400;color:var(--text2);}
+.header-sub{font-size:12px;color:var(--text2);font-variant-numeric:tabular-nums;}
+.tab-bar{display:flex;background:var(--surface);border-bottom:0.5px solid var(--border);position:sticky;top:45px;z-index:99;}
+.tab{flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;-webkit-tap-highlight-color:transparent;}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+.screen{display:none;padding:12px 12px 0;}
+.screen.active{display:block;}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;}
+.state-banner{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;margin-bottom:14px;transition:all 0.3s;}
+.state-ready{background:#ECEAE3;color:var(--text2);}
+.state-active{background:#D6EAB8;color:#27500A;}
+.state-done{background:#F5C4B3;color:#712B13;}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.metric{background:var(--bg2);border-radius:var(--radius-sm);padding:12px 14px;}
+.label{font-size:11px;color:var(--text2);margin-bottom:3px;}
+.value{font-size:19px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
+.value.sm{font-size:13px;}
+.timer-display{font-size:38px;font-weight:600;color:var(--text);text-align:center;letter-spacing:3px;padding:10px 0 14px;font-variant-numeric:tabular-nums;}
+.status-bar{display:flex;align-items:center;font-size:13px;color:var(--text2);margin-bottom:6px;}
+.status-dot{width:8px;height:8px;border-radius:50%;margin-right:7px;flex-shrink:0;}
+.dot-gray{background:#888780;}.dot-green{background:#5A9E22;box-shadow:0 0 0 3px rgba(90,158,34,0.2);}
+.dot-amber{background:#C48A10;box-shadow:0 0 0 3px rgba(196,138,16,0.2);}
+.dot-red{background:#D94040;box-shadow:0 0 0 3px rgba(217,64,64,0.2);}
+.bg-warn{display:none;background:#FFF3CD;border:1px solid #FFCA28;border-radius:6px;padding:7px 12px;font-size:12px;color:#7A5800;margin-bottom:8px;line-height:1.5;}
+.bg-warn.show{display:block;}
+.gps-quality{font-size:11px;padding:3px 8px;border-radius:4px;display:none;margin-bottom:8px;}
+.gps-q-high{background:#D6EAB8;color:#27500A;display:inline-block;}
+.gps-q-mid{background:#FFF0C0;color:#7A5800;display:inline-block;}
+.gps-q-low{background:#F5C4B3;color:#712B13;display:inline-block;}
+.weather-card{background:linear-gradient(135deg,#1a6fa8,#0e4a7a);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px;color:#fff;display:none;}
+.weather-card.show{display:block;}
+.w-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.w-icon{font-size:32px;}.w-temp{font-size:26px;font-weight:700;}
+.w-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.w-item{background:rgba(255,255,255,0.15);border-radius:6px;padding:7px 10px;}
+.w-item-label{font-size:10px;opacity:0.75;margin-bottom:2px;}
+.w-item-val{font-size:15px;font-weight:600;}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:12px 16px;margin-bottom:8px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;transition:opacity 0.15s;-webkit-tap-highlight-color:transparent;}
+.btn:active{opacity:0.75;}.btn:disabled{opacity:0.35;cursor:not-allowed;}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue-dk);}
+.btn-danger{background:var(--red);color:#fff;border-color:#7A1F1F;}
+.btn-img{background:var(--orange);color:#fff;border-color:#8C4208;}
+.btn-memo-png{background:var(--teal);color:#fff;border-color:#0A5C4F;}
+.btn-success{background:var(--green);color:#fff;border-color:#274F0A;}
+.map-wrap{position:relative;width:100%;border-radius:var(--radius);overflow:hidden;border:0.5px solid var(--border);margin-bottom:8px;}
+.map-inner{width:100%;height:300px;}
+#map-helper,#map-handler{width:100%;height:100%;}
+.wind-compass{position:absolute;top:10px;right:10px;z-index:500;width:58px;height:58px;background:rgba(255,255,255,0.93);border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.18);display:none;flex-direction:column;align-items:center;justify-content:center;}
+.wind-compass.show{display:flex;}
+.compass-label{font-size:8px;font-weight:700;color:#333;margin-top:1px;text-align:center;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text2);padding:2px 2px 10px;}
+.legend-item{display:flex;align-items:center;gap:4px;}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.gps-notice{font-size:12px;color:var(--text2);line-height:1.5;background:var(--bg2);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:10px;}
+.export-info{font-size:12px;color:var(--text2);text-align:center;margin-top:4px;margin-bottom:8px;}
+/* 메모 섹션 */
+.memo-section{display:none;}
+.memo-section.show{display:block;}
+.memo-hint{font-size:12px;color:var(--teal);background:#E8F5F2;border-radius:6px;padding:8px 12px;margin-bottom:10px;line-height:1.5;}
+textarea{width:100%;min-height:80px;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-size:14px;line-height:1.5;font-family:inherit;color:var(--text);background:var(--bg2);resize:vertical;}
+textarea:focus{outline:none;border-color:var(--blue);}
+.memo-list{margin-top:10px;}
+.memo-item{padding:9px 0;border-bottom:0.5px solid var(--border);font-size:13px;}
+.memo-item:last-child{border-bottom:none;}
+.memo-time{font-size:11px;color:var(--text2);margin-bottom:3px;}
+.memo-del{float:right;cursor:pointer;color:#ccc;font-size:14px;}
+.session-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--border);font-size:13px;}
+.session-row:last-child{border-bottom:none;}
+.session-info{flex:1;}.session-meta{color:var(--text2);font-size:12px;margin-top:2px;}
+.weather-tag{display:inline-flex;gap:8px;font-size:11px;background:var(--bg2);border-radius:4px;padding:2px 7px;margin-top:3px;color:var(--text2);}
+.btn-icon{width:32px;height:32px;border-radius:6px;border:0.5px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;}
+.leaflet-control-attribution{font-size:10px !important;}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <span class="header-title">🐾 <span>DK's</span> Mantrailing GPS</span>
+    <span class="header-sub" id="header-time"></span>
+  </header>
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('helper')">🏃 헬퍼</button>
+    <button class="tab"        onclick="switchTab('handler')">🦺 핸들러</button>
+    <button class="tab"        onclick="switchTab('log')">📋 훈련 로그</button>
+  </div>
+
+  <!-- ── 헬퍼 ── -->
+  <section id="screen-helper" class="screen active">
+    <div class="card">
+      <div class="state-banner state-ready" id="helper-banner">⏸ 이동 대기 중</div>
+      <div class="bg-warn" id="helper-bg-warn">⚠️ 화면이 꺼지면 GPS가 끊길 수 있습니다. 화면을 켜두세요.</div>
+      <div class="status-bar"><span class="status-dot dot-gray" id="helper-gps-dot"></span><span id="helper-gps-status">GPS 대기 중</span></div>
+      <div id="helper-gps-quality" class="gps-quality"></div>
+      <div class="timer-display" id="helper-timer">00:00:00</div>
+      <div class="metric-grid">
+        <div class="metric"><div class="label">출발 시각</div><div class="value sm" id="helper-start">—</div></div>
+        <div class="metric"><div class="label">도착 시각</div><div class="value sm" id="helper-end">—</div></div>
+        <div class="metric"><div class="label">거리</div><div class="value" id="helper-dist">0m</div></div>
+        <div class="metric"><div class="label">발걸음 수</div><div class="value" id="helper-steps">0</div></div>
+      </div>
+      <div class="weather-card" id="helper-weather">
+        <div class="w-top"><div class="w-icon" id="helper-w-icon">🌤️</div><div class="w-temp" id="helper-w-temp">—</div></div>
+        <div class="w-grid">
+          <div class="w-item"><div class="w-item-label">습도</div><div class="w-item-val" id="helper-w-humid">—</div></div>
+          <div class="w-item"><div class="w-item-label">풍향</div><div class="w-item-val" id="helper-w-dir">—</div></div>
+          <div class="w-item"><div class="w-item-label">풍속</div><div class="w-item-val" id="helper-w-wind">—</div></div>
+          <div class="w-item"><div class="w-item-label">체감온도</div><div class="w-item-val" id="helper-w-feel">—</div></div>
+        </div>
+      </div>
+      <p class="gps-notice" id="helper-notice">ℹ️ 추적 시작 시 위치 권한을 요청합니다. 화면을 켜둬야 GPS가 정확하게 기록됩니다.</p>
+      <button class="btn btn-primary" id="helper-start-btn" onclick="startTracking('helper')">▶ 이동 시작</button>
+      <button class="btn btn-danger"  id="helper-stop-btn"  onclick="stopTracking('helper')" style="display:none">⏹ 이동 완료</button>
+    </div>
+    <div class="map-wrap">
+      <div class="map-inner"><div id="map-helper"></div></div>
+      <div class="wind-compass" id="helper-compass">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="19" fill="none" stroke="#e0e0e0" stroke-width="1.2"/>
+          <text x="20" y="8"  font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">N</text>
+          <text x="20" y="37" font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">S</text>
+          <text x="5"  y="22" font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">W</text>
+          <text x="36" y="22" font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">E</text>
+          <g id="helper-arrow" transform="rotate(0,20,20)">
+            <polygon points="20,5 23,22 20,19 17,22" fill="#E24B4A"/>
+            <polygon points="20,35 23,18 20,21 17,18" fill="#bbb"/>
+          </g>
+        </svg>
+        <div class="compass-label" id="helper-compass-label">—</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#3B6D11"></span>출발</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>현재 위치</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>도착</span>
+    </div>
+    <button class="btn btn-img" id="helper-img-btn" onclick="captureMap('helper',false)" disabled>📸 지도 PNG 저장</button>
+    <p class="export-info" id="helper-export-info">이동 완료 후 저장 가능합니다</p>
+  </section>
+
+  <!-- ── 핸들러 ── -->
+  <section id="screen-handler" class="screen">
+    <div class="card">
+      <div class="state-banner state-ready" id="handler-banner">⏸ 추적 대기 중</div>
+      <div class="bg-warn" id="handler-bg-warn">⚠️ 화면이 꺼지면 GPS가 끊길 수 있습니다. 화면을 켜두세요.</div>
+      <div class="status-bar"><span class="status-dot dot-gray" id="handler-gps-dot"></span><span id="handler-gps-status">GPS 대기 중</span></div>
+      <div id="handler-gps-quality" class="gps-quality"></div>
+      <div class="timer-display" id="handler-timer">00:00:00</div>
+      <div class="metric-grid">
+        <div class="metric"><div class="label">출발 시각</div><div class="value sm" id="handler-start">—</div></div>
+        <div class="metric"><div class="label">도착 시각</div><div class="value sm" id="handler-end">—</div></div>
+        <div class="metric"><div class="label">거리</div><div class="value" id="handler-dist">0m</div></div>
+        <div class="metric"><div class="label">발걸음 수</div><div class="value" id="handler-steps">0</div></div>
+      </div>
+      <div class="weather-card" id="handler-weather">
+        <div class="w-top"><div class="w-icon" id="handler-w-icon">🌤️</div><div class="w-temp" id="handler-w-temp">—</div></div>
+        <div class="w-grid">
+          <div class="w-item"><div class="w-item-label">습도</div><div class="w-item-val" id="handler-w-humid">—</div></div>
+          <div class="w-item"><div class="w-item-label">풍향</div><div class="w-item-val" id="handler-w-dir">—</div></div>
+          <div class="w-item"><div class="w-item-label">풍속</div><div class="w-item-val" id="handler-w-wind">—</div></div>
+          <div class="w-item"><div class="w-item-label">체감온도</div><div class="w-item-val" id="handler-w-feel">—</div></div>
+        </div>
+      </div>
+      <p class="gps-notice" id="handler-notice">ℹ️ 추적 시작 시 위치 권한을 요청합니다. 화면을 켜둬야 GPS가 정확하게 기록됩니다.</p>
+      <button class="btn btn-primary" id="handler-start-btn" onclick="startTracking('handler')">▶ 추적 시작</button>
+      <button class="btn btn-danger"  id="handler-stop-btn"  onclick="stopTracking('handler')" style="display:none">⏹ 추적 완료</button>
+    </div>
+    <div class="map-wrap">
+      <div class="map-inner"><div id="map-handler"></div></div>
+      <div class="wind-compass" id="handler-compass">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="19" fill="none" stroke="#e0e0e0" stroke-width="1.2"/>
+          <text x="20" y="8"  font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">N</text>
+          <text x="20" y="37" font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">S</text>
+          <text x="5"  y="22" font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">W</text>
+          <text x="36" y="22" font-size="6.5" text-anchor="middle" fill="#999" font-weight="600">E</text>
+          <g id="handler-arrow" transform="rotate(0,20,20)">
+            <polygon points="20,5 23,22 20,19 17,22" fill="#E24B4A"/>
+            <polygon points="20,35 23,18 20,21 17,18" fill="#bbb"/>
+          </g>
+        </svg>
+        <div class="compass-label" id="handler-compass-label">—</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#3B6D11"></span>출발</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#D85A30"></span>현재 위치</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>도착</span>
+    </div>
+
+    <!-- 1단계: 기본 PNG 저장 -->
+    <button class="btn btn-img" id="handler-img-btn" onclick="captureMap('handler',false)" disabled>📸 지도 PNG 저장</button>
+    <p class="export-info" id="handler-export-info">추적 완료 후 저장 가능합니다</p>
+
+    <!-- 2단계: 메모 입력 후 재저장 (추적 완료 후 표시) -->
+    <div class="memo-section" id="handler-memo-section">
+      <div class="card">
+        <p class="label" style="margin-bottom:6px;font-size:13px;font-weight:600;color:var(--text)">훈련 메모</p>
+        <div class="memo-hint">📝 메모 입력 후 <strong>메모 포함 PNG 저장</strong>을 누르면<br>메모가 포함된 PNG 파일이 새로 저장됩니다.</div>
+        <textarea id="memo-input" placeholder="특이사항, 견공 컨디션, 훈련 환경 등..."></textarea>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+          <button class="btn btn-success" onclick="saveAndShowMemo()">✓ 메모 저장</button>
+          <button class="btn btn-memo-png" id="handler-memo-png-btn" onclick="captureMap('handler',true)" disabled>📸 메모 포함 PNG</button>
+        </div>
+        <div class="memo-list" id="memo-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 훈련 로그 ── -->
+  <section id="screen-log" class="screen">
+    <div class="metric-grid">
+      <div class="metric"><div class="label">이번 달 회차</div><div class="value" id="log-count">0회</div></div>
+      <div class="metric"><div class="label">총 누적 거리</div><div class="value" id="log-dist">0m</div></div>
+    </div>
+    <div class="card">
+      <p class="label" style="margin-bottom:10px">저장된 훈련 기록</p>
+      <div id="session-list"><p style="color:#888;font-size:13px">아직 저장된 기록이 없습니다.</p></div>
+    </div>
+    <button class="btn" style="margin-top:0.5rem" onclick="clearLog()">🗑 전체 기록 초기화</button>
+  </section>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+const TILE_URL='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTR='© OpenStreetMap contributors';
+const DEF_CENTER=[37.5665,126.9780];
+const DEF_ZOOM=16;
+const STORAGE_KEY='mantrailing_v8';
+const MEMO_KEY='mantrailing_memos_v3';
+const STEP_PER_M=1/0.75;
+const GPS_OPTS={enableHighAccuracy:true,maximumAge:0,timeout:10000};
+
+const WMO_ICON={0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',95:'⛈️',96:'⛈️',99:'⛈️'};
+function degToDir(d){const a=['북','북북동','북동','동북동','동','동남동','남동','남남동','남','남남서','남서','서남서','서','서북서','북서','북북서'];return a[Math.round(d/22.5)%16];}
+
+function makeState(){
+  return{map:null,polyline:null,startMarker:null,endMarker:null,currentMarker:null,
+    watchId:null,timerInterval:null,pollInterval:null,wakeLock:null,
+    seconds:0,pathCoords:[],totalDist:0,steps:0,
+    startTimeStr:'',endTimeStr:'',startDateStr:'',weather:null};
+}
+const ST={helper:makeState(),handler:makeState()};
+
+const pad=v=>String(v).padStart(2,'0');
+const nowStr=()=>{const n=new Date();return`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;};
+const nowDate=()=>{const n=new Date();return`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;};
+const nowFile=()=>{const n=new Date();return`${n.getFullYear()}${pad(n.getMonth()+1)}${pad(n.getDate())}_${pad(n.getHours())}${pad(n.getMinutes())}`;};
+const fmtTime=s=>[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>pad(v)).join(':');
+const fmtDist=m=>m<1000?`${Math.round(m)}m`:`${(m/1000).toFixed(2)}km`;
+const $=id=>document.getElementById(id);
+
+function haversine(a,b){
+  const R=6371000,r=d=>d*Math.PI/180;
+  const x=Math.sin(r(b[0]-a[0])/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(r(b[1]-a[1])/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+// ── Wake Lock ─────────────────────────────────────────────────────────
+async function acquireWakeLock(role){
+  if(!('wakeLock' in navigator))return;
+  try{
+    ST[role].wakeLock=await navigator.wakeLock.request('screen');
+    ST[role].wakeLock.addEventListener('release',()=>{if(ST[role].watchId!==null)acquireWakeLock(role);});
+  }catch(e){$(`${role}-bg-warn`).classList.add('show');}
+}
+function releaseWakeLock(role){if(ST[role].wakeLock){ST[role].wakeLock.release();ST[role].wakeLock=null;}}
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)return;
+  ['helper','handler'].forEach(role=>{
+    const s=ST[role];if(s.watchId===null)return;
+    navigator.geolocation.clearWatch(s.watchId);
+    s.watchId=navigator.geolocation.watchPosition(pos=>onPos(role,pos),err=>onErr(role,err),GPS_OPTS);
+    acquireWakeLock(role);
+  });
+});
+
+// ── 날씨 ─────────────────────────────────────────────────────────────
+async function fetchWeather(role,lat,lng){
+  try{
+    const u=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}`
+      +`&current=temperature_2m,apparent_temperature,relative_humidity_2m`
+      +`,wind_speed_10m,wind_direction_10m,weather_code&wind_speed_unit=ms&timezone=auto`;
+    const c=(await(await fetch(u)).json()).current;
+    const dir=degToDir(c.wind_direction_10m);
+    const w={icon:WMO_ICON[c.weather_code]||'🌡️',temp:`${c.temperature_2m.toFixed(1)}°C`,feel:`${c.apparent_temperature.toFixed(1)}°C`,humid:`${c.relative_humidity_2m}%`,wind:`${c.wind_speed_10m.toFixed(1)}m/s`,dir,dirDeg:c.wind_direction_10m};
+    ST[role].weather=w;
+    $(`${role}-weather`).classList.add('show');
+    $(`${role}-w-icon`).textContent=w.icon;$(`${role}-w-temp`).textContent=w.temp;
+    $(`${role}-w-humid`).textContent=w.humid;$(`${role}-w-dir`).textContent=`${w.dir} (${w.dirDeg}°)`;
+    $(`${role}-w-wind`).textContent=w.wind;$(`${role}-w-feel`).textContent=w.feel;
+    $(`${role}-arrow`).setAttribute('transform',`rotate(${w.dirDeg},20,20)`);
+    $(`${role}-compass-label`).textContent=w.dir;
+    $(`${role}-compass`).classList.add('show');
+  }catch(e){console.warn('날씨 오류:',e);}
+}
+
+// ── 아이콘 ───────────────────────────────────────────────────────────
+function makeIcon(bg,letter,size=28){
+  return L.divIcon({className:'',html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${Math.round(size*.43)}px;border:2.5px solid rgba(255,255,255,.9);box-shadow:0 2px 6px rgba(0,0,0,.35)">${letter}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});
+}
+function pulseIcon(color){
+  return L.divIcon({className:'',html:`<div style="width:18px;height:18px;border-radius:50%;background:${color};border:3px solid rgba(255,255,255,.95);box-shadow:0 0 0 6px ${color}44,0 2px 5px rgba(0,0,0,.25)"></div>`,iconSize:[18,18],iconAnchor:[9,9]});
+}
+
+// ── 지도 초기화 ──────────────────────────────────────────────────────
+function initMap(role){
+  const s=ST[role];if(s.map)return;
+  const color=role==='helper'?'#185FA5':'#D85A30';
+  s.map=L.map(`map-${role}`,{zoomControl:true}).setView(DEF_CENTER,DEF_ZOOM);
+  L.tileLayer(TILE_URL,{attribution:TILE_ATTR,maxZoom:19}).addTo(s.map);
+  s.polyline=L.polyline([],{color,weight:4,lineCap:'round',lineJoin:'round',opacity:0.9}).addTo(s.map);
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['helper','handler','log'][i]===name));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $('screen-'+name).classList.add('active');
+  setTimeout(()=>{
+    if(name!=='log'){initMap(name);ST[name].map?.invalidateSize();}
+    if(name==='log')renderLog();
+    if(name==='handler')renderMemoList();
+  },60);
+}
+
+// ── 추적 ─────────────────────────────────────────────────────────────
+function startTracking(role){
+  if(!navigator.geolocation){setStatus(role,'red','GPS 미지원 브라우저');return;}
+  initMap(role);
+  const s=ST[role],isHelper=role==='helper';
+  s.pathCoords=[];s.totalDist=0;s.seconds=0;s.steps=0;s.weather=null;
+  s.startTimeStr=nowStr();s.startDateStr=nowDate();
+  $(`${role}-start`).textContent=s.startTimeStr;
+  $(`${role}-end`).textContent='—';
+  $(`${role}-dist`).textContent='0m';
+  $(`${role}-steps`).textContent='0';
+  $(`${role}-timer`).textContent='00:00:00';
+  $(`${role}-start-btn`).style.display='none';
+  $(`${role}-stop-btn`).style.display='';
+  $(`${role}-img-btn`).disabled=true;
+  $(`${role}-notice`).style.display='none';
+  $(`${role}-weather`).classList.remove('show');
+  $(`${role}-compass`).classList.remove('show');
+  $(`${role}-bg-warn`).classList.remove('show');
+  $(`${role}-gps-quality`).className='gps-quality';
+  // 핸들러 메모 섹션 숨김
+  if(role==='handler'){
+    $('handler-memo-section').classList.remove('show');
+    $('handler-memo-png-btn').disabled=true;
+  }
+  setBanner(role,'active',isHelper?'🏃 이동 중...':'🦺 추적 중...');
+  setStatus(role,'amber','GPS 신호 수신 중...');
+  [s.startMarker,s.endMarker,s.currentMarker].forEach(m=>{if(m)s.map.removeLayer(m);});
+  s.startMarker=s.endMarker=s.currentMarker=null;
+  s.polyline.setLatLngs([]);
+  s.timerInterval=setInterval(()=>{s.seconds++;$(`${role}-timer`).textContent=fmtTime(s.seconds);},1000);
+  acquireWakeLock(role);
+  s.watchId=navigator.geolocation.watchPosition(pos=>onPos(role,pos),err=>onErr(role,err),GPS_OPTS);
+  s.pollInterval=setInterval(()=>{
+    if(ST[role].watchId===null)return;
+    navigator.geolocation.getCurrentPosition(pos=>onPos(role,pos),()=>{},{enableHighAccuracy:true,maximumAge:0,timeout:3000});
+  },500);
+}
+
+function onPos(role,pos){
+  const s=ST[role];
+  const{latitude:lat,longitude:lng,accuracy}=pos.coords,coord=[lat,lng];
+  const color=role==='helper'?'#185FA5':'#D85A30';
+  const qEl=$(`${role}-gps-quality`);
+  if(accuracy<=5){qEl.className='gps-quality gps-q-high';qEl.textContent=`GPS 최고 ±${accuracy.toFixed(1)}m`;}
+  else if(accuracy<=15){qEl.className='gps-quality gps-q-mid';qEl.textContent=`GPS 양호 ±${accuracy.toFixed(1)}m`;}
+  else{qEl.className='gps-quality gps-q-low';qEl.textContent=`GPS 약함 ±${Math.round(accuracy)}m`;}
+  if(s.pathCoords.length>0&&accuracy>25)return;
+  if(s.pathCoords.length===0){
+    s.map.setView(coord,18);
+    s.startMarker=L.marker(coord,{icon:makeIcon('#3B6D11','S')}).bindTooltip(`출발 ${s.startTimeStr}`,{permanent:true,direction:'top',offset:[0,-14]}).addTo(s.map);
+    setStatus(role,'green',`GPS 수신 중 (±${Math.round(accuracy)}m)`);
+    fetchWeather(role,lat,lng);
+  }else{
+    const d=haversine(s.pathCoords[s.pathCoords.length-1],coord);
+    if(d<0.3)return;
+    s.totalDist+=d;s.steps=Math.round(s.totalDist*STEP_PER_M);
+    $(`${role}-dist`).textContent=fmtDist(s.totalDist);
+    $(`${role}-steps`).textContent=s.steps.toLocaleString();
+  }
+  s.pathCoords.push(coord);s.polyline.setLatLngs(s.pathCoords);
+  if(s.currentMarker)s.currentMarker.setLatLng(coord);
+  else s.currentMarker=L.marker(coord,{icon:pulseIcon(color)}).addTo(s.map);
+  s.map.panTo(coord);
+}
+
+function onErr(role,err){const msgs={1:'위치 권한 거부',2:'GPS 신호 없음',3:'GPS 시간 초과'};setStatus(role,'red',msgs[err.code]||'GPS 오류');}
+
+function stopTracking(role){
+  const s=ST[role],isHelper=role==='helper';
+  if(s.watchId!==null){navigator.geolocation.clearWatch(s.watchId);s.watchId=null;}
+  if(s.pollInterval){clearInterval(s.pollInterval);s.pollInterval=null;}
+  clearInterval(s.timerInterval);
+  releaseWakeLock(role);
+  s.endTimeStr=nowStr();
+  $(`${role}-end`).textContent=s.endTimeStr;
+  $(`${role}-start-btn`).style.display='';
+  $(`${role}-stop-btn`).style.display='none';
+  $(`${role}-bg-warn`).classList.remove('show');
+  setBanner(role,'done',isHelper?'✅ 이동 완료':'✅ 추적 완료');
+  setStatus(role,'red',`완료 · ${s.pathCoords.length}포인트 기록`);
+  if(s.pathCoords.length>0){
+    const last=s.pathCoords[s.pathCoords.length-1];
+    if(s.currentMarker){s.map.removeLayer(s.currentMarker);s.currentMarker=null;}
+    s.endMarker=L.marker(last,{icon:makeIcon('#E24B4A','E')}).bindTooltip(`도착 ${s.endTimeStr}`,{permanent:true,direction:'top',offset:[0,-14]}).addTo(s.map);
+    if(s.pathCoords.length>1)s.map.fitBounds(s.polyline.getBounds(),{padding:[36,36]});
+  }
+  $(`${role}-img-btn`).disabled=false;
+  $(`${role}-export-info`).textContent=`PNG 저장 가능 (${s.pathCoords.length}포인트)`;
+  // 핸들러만 메모 섹션 표시
+  if(role==='handler'){
+    $('handler-memo-section').classList.add('show');
+    renderMemoList();
+  }
+  saveSession(role);
+}
+
+// ── PNG 캡처 ─────────────────────────────────────────────────────────
+// withMemo=false: 기본 저장 / withMemo=true: 가장 최근 메모 포함
+function captureMap(role, withMemo){
+  const s=ST[role];
+  if(!s.pathCoords.length)return;
+  const btn=withMemo?$('handler-memo-png-btn'):$(`${role}-img-btn`);
+  btn.disabled=true;btn.textContent='⏳ 저장 중...';
+
+  const OW=1200, OH=withMemo?960:900;
+  const TILE=256;
+
+  const lats=s.pathCoords.map(c=>c[0]),lngs=s.pathCoords.map(c=>c[1]);
+  const minLat=Math.min(...lats),maxLat=Math.max(...lats);
+  const minLng=Math.min(...lngs),maxLng=Math.max(...lngs);
+  const cLat=(minLat+maxLat)/2,cLng=(minLng+maxLng)/2;
+
+  // 최적 줌 계산
+  let zoom=18;
+  for(let z=18;z>=1;z--){
+    const scale=TILE*(1<<z);
+    function wx(lng){return scale*(0.5+lng/360);}
+    function wy(lat){const s2=Math.min(Math.max(Math.sin(lat*Math.PI/180),-0.9999),0.9999);return scale*(0.5-Math.log((1+s2)/(1-s2))/(4*Math.PI));}
+    const pw=Math.abs(wx(maxLng)-wx(minLng)),ph=Math.abs(wy(minLat)-wy(maxLat));
+    const mapAreaH=withMemo?OH-160:OH-110;
+    if(pw<OW*0.75&&ph<mapAreaH*0.75){zoom=z;break;}
+  }
+
+  function latlngToWorld(lat,lng){
+    const scale=TILE*(1<<zoom);
+    const siny=Math.min(Math.max(Math.sin(lat*Math.PI/180),-0.9999),0.9999);
+    return{x:scale*(0.5+lng/360),y:scale*(0.5-Math.log((1+siny)/(1-siny))/(4*Math.PI))};
+  }
+  const mapAreaH=withMemo?OH-160:OH-110;
+  const cW=latlngToWorld(cLat,cLng);
+  function toCanvas(lat,lng){const w=latlngToWorld(lat,lng);return{x:(w.x-cW.x)+OW/2,y:(w.y-cW.y)+mapAreaH/2};}
+
+  const canvas=document.createElement('canvas');
+  canvas.width=OW;canvas.height=OH;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#e8eff5';ctx.fillRect(0,0,OW,OH);
+
+  const nwX=cW.x-OW/2,nwY=cW.y-mapAreaH/2;
+  const tX0=Math.floor(nwX/TILE),tY0=Math.floor(nwY/TILE);
+  const tX1=Math.ceil((nwX+OW)/TILE),tY1=Math.ceil((nwY+mapAreaH)/TILE);
+  const maxT=1<<zoom;
+  const jobs=[];
+  for(let tx=tX0;tx<=tX1;tx++){
+    for(let ty=tY0;ty<=tY1;ty++){
+      if(ty<0||ty>=maxT)continue;
+      const tilex=((tx%maxT)+maxT)%maxT;
+      jobs.push({url:`https://tile.openstreetmap.org/${zoom}/${tilex}/${ty}.png`,dx:tx*TILE-nwX,dy:ty*TILE-nwY});
+    }
+  }
+
+  let done=0;
+  const afterTiles=()=>{
+    drawFinal(ctx,OW,OH,mapAreaH,toCanvas,s,role,withMemo,canvas);
+    const label=withMemo?'📸 메모 포함 PNG':'📸 지도 PNG 저장';
+    btn.disabled=false;btn.textContent=label;
+  };
+  if(!jobs.length){afterTiles();return;}
+  jobs.forEach(({url,dx,dy})=>{
+    const img=new Image();img.crossOrigin='anonymous';
+    const onDone=()=>{if(++done===jobs.length)afterTiles();};
+    img.onload=()=>{ctx.drawImage(img,dx,dy,TILE,TILE);onDone();};
+    img.onerror=onDone;
+    img.src=url;
+  });
+}
+
+function drawFinal(ctx,OW,OH,mapAreaH,toCanvas,s,role,withMemo,canvas){
+  const color=role==='helper'?'#185FA5':'#D85A30';
+
+  // 경로선
+  if(s.pathCoords.length>1){
+    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=5;ctx.lineCap='round';ctx.lineJoin='round';
+    const p0=toCanvas(s.pathCoords[0][0],s.pathCoords[0][1]);
+    ctx.moveTo(p0.x,p0.y);
+    for(let i=1;i<s.pathCoords.length;i++){const p=toCanvas(s.pathCoords[i][0],s.pathCoords[i][1]);ctx.lineTo(p.x,p.y);}
+    ctx.stroke();
+  }
+  // 마커
+  function dot(lat,lng,bg,letter){
+    const p=toCanvas(lat,lng),r=14;
+    ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fillStyle=bg;ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.92)';ctx.lineWidth=2.5;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(letter,p.x,p.y);ctx.textBaseline='alphabetic';
+  }
+  dot(s.pathCoords[0][0],s.pathCoords[0][1],'#3B6D11','S');
+  dot(s.pathCoords[s.pathCoords.length-1][0],s.pathCoords[s.pathCoords.length-1][1],'#E24B4A','E');
+
+  // ── 워터마크 ──────────────────────────────────────────────────────
+  const w=s.weather;
+  const baseH=withMemo?160:110;
+  ctx.fillStyle='rgba(15,30,50,0.90)';
+  ctx.fillRect(0,OH-baseH,OW,baseH);
+
+  // 줄 1: 날짜 + 출발 + 도착 + 거리 + 걸음
+  ctx.textAlign='left';
+  ctx.fillStyle='#ffffff';ctx.font='bold 20px -apple-system,sans-serif';
+  ctx.fillText(
+    `${s.startDateStr}   출발 ${s.startTimeStr}   도착 ${s.endTimeStr}   이동거리 ${fmtDist(s.totalDist)}   발걸음 ${s.steps.toLocaleString()}보`,
+    20, OH-baseH+32
+  );
+  // 줄 2: 날씨
+  ctx.fillStyle='rgba(200,230,255,0.90)';ctx.font='17px -apple-system,sans-serif';
+  ctx.fillText(
+    w?`${w.icon} ${w.temp}   체감 ${w.feel}   💧 ${w.humid}   🧭 ${w.dir}   💨 ${w.wind}`:'날씨 정보 없음',
+    20, OH-baseH+62
+  );
+
+  // 줄 3: 메모 (핸들러 + withMemo=true 일 때만)
+  if(withMemo && role==='handler'){
+    const memos=loadMemos();
+    const memoText=memos.length>0?memos[0].text.replace(/\n/g,' '):'';
+    if(memoText){
+      // 메모 배경 강조
+      ctx.fillStyle='rgba(255,220,60,0.18)';
+      ctx.fillRect(0,OH-baseH+76,OW,baseH-80);
+      ctx.fillStyle='rgba(255,220,80,1.0)';ctx.font='bold 16px -apple-system,sans-serif';
+      ctx.fillText('📝 메모', 20, OH-baseH+100);
+      ctx.fillStyle='rgba(255,255,200,0.95)';ctx.font='16px -apple-system,sans-serif';
+      // 메모 줄바꿈 처리 (최대 2줄)
+      const lines=memos[0].text.split('\n').slice(0,2);
+      lines.forEach((line,i)=>{
+        const txt=line.length>90?line.slice(0,87)+'…':line;
+        ctx.fillText(txt, 20, OH-baseH+100+(i+1)*24);
+      });
+    }
+  }
+
+  canvas.toBlob(blob=>{
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    const suffix=withMemo?'_memo':'';
+    a.href=url;a.download=`mantrailing_${role}${suffix}_${nowFile()}.png`;
+    a.click();URL.revokeObjectURL(url);
+  },'image/png');
+}
+
+// ── 메모 ─────────────────────────────────────────────────────────────
+function saveAndShowMemo(){
+  const text=$('memo-input').value.trim();if(!text)return;
+  const memos=loadMemos();
+  memos.unshift({id:Date.now(),date:nowDate(),time:nowStr(),text});
+  localStorage.setItem(MEMO_KEY,JSON.stringify(memos.slice(0,200)));
+  $('memo-input').value='';
+  $('handler-memo-png-btn').disabled=false; // 메모 저장 후 PNG 버튼 활성화
+  renderMemoList();
+}
+function loadMemos(){try{return JSON.parse(localStorage.getItem(MEMO_KEY)||'[]');}catch{return[];}}
+function renderMemoList(){
+  const memos=loadMemos(),list=$('memo-list');
+  if(!list)return;
+  if(!memos.length){list.innerHTML='<p style="color:#888;font-size:12px;padding-top:8px">저장된 메모가 없습니다.</p>';return;}
+  list.innerHTML=memos.map(m=>`
+    <div class="memo-item">
+      <div class="memo-time">${m.date} ${m.time}<span class="memo-del" onclick="deleteMemo(${m.id})">✕</span></div>
+      <div>${m.text.replace(/\n/g,'<br>')}</div>
+    </div>`).join('');
+}
+function deleteMemo(id){localStorage.setItem(MEMO_KEY,JSON.stringify(loadMemos().filter(m=>m.id!==id)));renderMemoList();}
+
+// ── 세션 ─────────────────────────────────────────────────────────────
+function saveSession(role){
+  const s=ST[role],sessions=loadSessions();
+  sessions.unshift({id:Date.now(),role,date:s.startDateStr,start:s.startTimeStr,end:s.endTimeStr,duration:fmtTime(s.seconds),dist_m:Math.round(s.totalDist),steps:s.steps,pointCount:s.pathCoords.length,coords:s.pathCoords,weather:s.weather||null});
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(sessions.slice(0,100)));
+}
+function loadSessions(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');}catch{return[];}}
+function renderLog(){
+  const sessions=loadSessions();
+  const thisMonth=new Date().toISOString().slice(0,7);
+  $('log-count').textContent=`${sessions.filter(s=>s.date.startsWith(thisMonth)).length}회`;
+  $('log-dist').textContent=fmtDist(sessions.reduce((a,s)=>a+(s.dist_m||0),0));
+  const list=$('session-list');
+  if(!sessions.length){list.innerHTML='<p style="color:#888;font-size:13px">아직 저장된 기록이 없습니다.</p>';return;}
+  const rl=r=>r==='helper'?'🏃 헬퍼':'🦺 핸들러';
+  list.innerHTML=sessions.map(s=>`
+    <div class="session-row">
+      <div class="session-info">
+        <div>${rl(s.role)} &nbsp;${s.date} · ${s.start} 출발</div>
+        <div class="session-meta">소요 ${s.duration} · ${fmtDist(s.dist_m)} · ${(s.steps||0).toLocaleString()}걸음 · ${s.pointCount||0}pt</div>
+        ${s.weather?`<div class="weather-tag">${s.weather.icon}${s.weather.temp} 💧${s.weather.humid} 🧭${s.weather.dir} 💨${s.weather.wind}</div>`:''}
+      </div>
+      <div><div class="btn-icon" onclick="delSession(${s.id})">🗑</div></div>
+    </div>`).join('');
+}
+function delSession(id){if(!confirm('삭제할까요?'))return;localStorage.setItem(STORAGE_KEY,JSON.stringify(loadSessions().filter(s=>s.id!==id)));renderLog();}
+function clearLog(){if(!confirm('전체 초기화할까요?'))return;localStorage.removeItem(STORAGE_KEY);renderLog();}
+
+function setStatus(r,c,t){$(`${r}-gps-dot`).className='status-dot dot-'+c;$(`${r}-gps-status`).textContent=t;}
+function setBanner(r,type,t){const el=$(`${r}-banner`);el.className=`state-banner state-${type}`;el.textContent=t;}
+
+setInterval(()=>{const el=$('header-time');if(el)el.textContent=nowStr();},1000);
+setTimeout(()=>initMap('helper'),200);
+</script>
+</body>
+</html>
